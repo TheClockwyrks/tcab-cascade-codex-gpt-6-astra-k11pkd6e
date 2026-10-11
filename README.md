@@ -1,94 +1,87 @@
-# Cascade — starter project
+# Cascade
 
-This repository is the starting point for building **Cascade**, the game the
-specification under `specs/` describes. Read `specs/overview.md` first; it says
-how the rest of the specification is organized.
+A complete Draw Three Klondike solitaire for the browser. Build four foundations
+from Ace to King on a quiet felt table, then watch every card launch, bounce, and
+paint the table in a victory cascade. There is no score, timer, account, or server.
 
-The project is already wired up. It builds on the **Simple 2D** engine, which is
-installed as an ordinary dependency and documents itself under `engine/` — read
-that alongside the specs. What is missing is the game.
+## Run locally
 
-## What you own
+```sh
+npm ci
+npm run dev
+```
 
-**`src/game.ts`, and any new files you add beside it.**
+Open the local URL printed by Vite. Dependencies include the supplied Simple 2D
+engine; no additional setup, assets, credentials, or network services are needed.
+All artwork is drawn in code and all ten sound cues are synthesized locally.
 
-Start by declaring and exporting `CascadeState`, exactly as `specs/state.md` fixes
-it, and `CascadeDebugApi`, the debug and automation surface
-`specs/instrumentation.md` specifies. The stub in `src/game.ts` is written against
-both names, so the project does not compile until they exist — a fresh workspace
-failing `npm run typecheck` is the starting point, not a broken seed.
+## Production build
 
-`src/game.ts` then exports `game`, a `Game<CascadeState, CascadeDebugApi>`: three
-functions over that state. `initialize` builds the state and the debug surface
-once and returns them together as `[state, debug]`; `update` takes the current
-state as a read-only view (`DeepReadonly<CascadeState>`, from `ts-essentials`) and
-returns the next state, advanced against the frame's delta time in seconds; and
-`render` is handed that next state, read-only again, and draws it. The engine
-holds the state by value and replaces it with whatever `update` returns, so a
-frame builds the next state from the current one rather than writing into it, and
-the type is what guarantees that rendering changes nothing. All three currently
-throw `"not implemented"`. Implement them.
+```sh
+npm ci
+npm run build
+```
 
-The debug surface is a required deliverable. The engine returns it from
-`engine.debug` exactly as `initialize` handed it over, and that is how the game is
-driven from code, so it is present and exactly as `specs/instrumentation.md`
-specifies. Because nothing holds a writable state, its operations are written in
-the shape of `update`: a pose takes the current state and returns the next, and a
-caller applies it through `engine.apply((s) => debug.addCard(s, ...))`; a reading
-takes the state and returns what it read, as `debug.snapshot(engine.state)`.
-`move` and `autoMove` are neither, because each applies the game's own rules and
-then reports what those rules decided: each returns the pair `[nextState,
-boolean]`. Nothing is published to the page.
+The complete static site is written to `dist/`, with `dist/index.html` as its
+entry point. Serve that directory with any static server, at a domain root or
+under a sub-path. To preview it locally:
 
-`CascadeState` **is a contract**. Keep every field, under the name, type, and
-meaning `specs/state.md` gives it. You may add fields, but only for data you can
-rebuild from the declared ones: the declared fields are the whole of the
-authoritative state, and the surface's `reset()` restores exactly those.
+```sh
+npm run preview
+```
 
-Cascade draws every card, the table, the HUD and every screen in code. There are
-no image assets, and none are seeded.
+## Controls
 
-Tests you write belong beside your sources as `src/**/*.test.ts`. `npm test` runs
-them in process, with coverage over the code you write under `src/`.
-`@napi-rs/canvas` is installed to supply the 2D context, so a test stands the
-engine up over a canvas and a clock of its own, steps it with `engine.advance`,
-and reads the result back through the debug surface. The engine's documentation
-carries a worked example of driving it that way.
+- Click or tap the stock to turn three cards. Only the front card of the visible
+  packet is playable. Click the empty stock to recycle the waste.
+- Drag a face-up card, or a descending run of alternating colors, onto a column.
+  Only a King can fill an empty column.
+- Build each foundation upward by suit, from Ace to King. Double-click or
+  double-tap an exposed tableau card or the front waste card to send it home.
+- A foundation's top card may move back to a column. An invalid drop returns the
+  held cards without changing the board.
+- Use **NEW GAME**, **MENU**, and **SOUND** along the bottom of the table.
+- Navigate menus with **↑ / W** and **↓ / S**. **Enter / Space** activates the
+  selected item. **Escape** returns from the instructions.
+- After a win, click or tap anywhere to deal again, even during the cascade.
+- **Backquote** toggles the engine's read-only diagnostics overlay.
 
-## What you must not edit
+The stage fits the viewport with letterboxing, and pointer coordinates remain
+consistent at different window sizes and pixel densities. A session starts fresh;
+there is no saved game or persistent setting.
 
-- **`src/main.ts`** — the fixed entry point. It creates the engine over the page's
-  canvas, binds `game` to it, and runs.
-- **`src/constants.ts`** — every figure the specification fixes: the table's
-  geometry, the key bindings, the deck, this build's deal mode, the
-  cascade's figures, the screen copy, and the cue names. Read from it.
-- **`index.html`** — the page and the canvas the engine fits the stage into.
-- **The toolchain** — `package.json`, `tsconfig.json`, `vite.config.ts`,
-  `vitest.config.ts`, `eslint.config.js`, `.prettierrc.json`, `.prettierignore`,
-  and `.gitignore`.
-- **`.vendor/`** — the vendored engine.
-- **`engine/`** — the engine's own documentation.
+## Validation
 
-Add dependencies to `package.json` if you genuinely need them, and commit the
-`package-lock.json` — the build is installed with `npm ci`. Leave the existing
-entries alone.
+```sh
+npx tsc --noEmit
+npx eslint .
+npx prettier --check .
+npx vitest run --coverage
+```
 
-## Commands
+Tests cover the deck, stock packet memory, legal and rejected moves, pointer and
+keyboard input, menu navigation, diagnostics, sound events, cascade motion and
+faculty gates. Engine integration tests render onto a real 2D canvas and exercise
+recording. Coverage reports are written to `coverage/`.
 
-- `npm run dev` — serves the game with hot reload.
-- `npm run build` — type-checks, then emits the static site into `dist/`.
-- `npm run preview` — serves `dist/` for a final check.
-- `npm run typecheck` — `tsc --noEmit`.
-- `npm run lint` — ESLint.
-- `npm run format` — Prettier, in check mode.
-- `npm test` — Vitest over `src/**/*.test.ts`, with coverage.
+`src/game.ts` exports the state types and game contract. `src/rules.ts` contains
+the immutable, render-free transitions and the debug surface; `src/geometry.ts`
+shares geometry between input and drawing; `src/drawing.ts` renders the screens
+and maintains only drawing caches. The debug surface is available solely through
+`engine.debug`: use `engine.apply(s => engine.debug.deal(s))` for a pose and
+`engine.debug.snapshot(engine.state)` for a read. Nothing is exposed on the page.
+The engine's API is documented in `engine/`.
 
-## Before you finish
+## Showcase
 
-- `npm run build` produces `dist/` with `index.html` at its root, and that
-  directory runs as-is on any static host.
-- `npm run typecheck`, `npm run lint`, `npm run format`, and `npm test` all pass.
-  The same four commands are run over the repository you leave behind.
-- **Replace this file** with the `README.md` `specs/overview.md` asks the
-  finished build to ship: what the game is, how to install it, how to run it in
-  development, how to produce the production build, and the controls.
+`showcase/` contains the player description, carousel, screenshots, and a
+four-second engine replay of legal pointer play. No board or outcome was posed
+for these captures. To reproduce them, keep the development server running and
+run:
+
+```sh
+node scripts/capture.mjs
+```
+
+The capture uses the project's Playwright Chromium with `--no-sandbox`. Set
+`CASCADE_URL` if the development server is not at `http://localhost:5173`.

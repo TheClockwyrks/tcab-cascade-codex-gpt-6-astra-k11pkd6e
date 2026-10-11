@@ -1,0 +1,11 @@
+[[media]]
+file = "live-play.json.gz"
+name = "Find a place, turn a possibility"
+
+[[media]]
+file = "table.png"
+name = "Three at a time"
+
+[[media]]
+file = "title.png"
+name = "A table for one"
